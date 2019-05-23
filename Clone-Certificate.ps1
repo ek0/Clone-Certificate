@@ -33,6 +33,7 @@ For($i = $certificates.Length - 1; $i -gt 0; $i--)
         Import-Certificate -FilePath ".\$t.cer" -CertStoreLocation cert:\CurrentUser\Root\
         $imported = $true
     }
+    Remove-Item -Path ".\$t.cer" # Not needed anymore, cleaning up
 }
 
 Set-AuthenticodeSignature -Certificate $cloned_cert -FilePath $TargetFile
