@@ -1,5 +1,6 @@
 param([Parameter(Mandatory=$true)] [String]$OriginalFile,
-      [Parameter(Mandatory=$true)] [String]$TargetFile)
+      [Parameter(Mandatory=$true)] [String]$TargetFile,
+      [switch]$LocalMachine)
 
 # Setup Cert Store in Reg
 $CertStoreLocation = @{ CertStoreLocation = 'Cert:\CurrentUser\My' }
@@ -30,7 +31,13 @@ For($i = $certificates.Length - 1; $i -gt 0; $i--)
     if($imported -ne $true)
     {
         Export-Certificate -Type CERT -FilePath ".\$t.cer" -Cert $cloned_cert
-        Import-Certificate -FilePath ".\$t.cer" -CertStoreLocation cert:\CurrentUser\Root\
+        if($localmachine) {
+            # Import in the local machine's CA store
+            Import-Certificate -FilePath ".\$t.cer" -CertStoreLocation cert:\LocalMachine\Root\
+        } else {
+            # Import in the current user's CA store
+            Import-Certificate -FilePath ".\$t.cer" -CertStoreLocation cert:\CurrentUser\Root\
+        }
         $imported = $true
     }
     Remove-Item -Path ".\$t.cer" # Not needed anymore, cleaning up
